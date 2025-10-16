@@ -1,24 +1,42 @@
-import os
-import time
-import threading
 import numpy as np
+import os
+from colorama import Fore
+from colorama import Style
+from copy import deepcopy
 import pygame
 from pygame.constants import KEYDOWN
+import dfs
 
-#import bfs
-#import astar
+''' TIME OUT FOR ALL ALGORITHM : 30 MIN ~ 1800 SECONDS '''
+TIME_OUT = 1800
+''' GET THE TESTCASES AND CHECKPOINTS PATH FOLDERS '''
+path_board = os.getcwd() + '\\..\\Testcases'
+path_checkpoint = os.getcwd() + '\\..\\Checkpoints'
 
-# ==============================
-# CONFIGURATION
-# ==============================
-ROOT_DIR = os.getcwd()
-PATH_BOARD = os.path.join(ROOT_DIR, '..', 'Testcases')
-PATH_CHECKPOINT = os.path.join(ROOT_DIR, '..', 'Checkpoints')
-ASSETS_PATH = os.path.join(ROOT_DIR, '..', 'Assets')
+''' TRAVERSE TESTCASE FILES AND RETURN A SET OF BOARD '''
+def get_boards():
+    os.chdir(path_board)
+    list_boards = []
+    for file in os.listdir():
+        if file.endswith(".txt"):
+            file_path = f"{path_board}\{file}"
+            board = get_board(file_path)
+            # print(file)
+            list_boards.append(board)
+    return list_boards
 
-# ==============================
-# UTILITY FUNCTIONS
-# ==============================
+''' TRAVERSE CHECKPOINT FILES AND RETURN A SET OF CHECKPOINT '''
+def get_check_points():
+    os.chdir(path_checkpoint)
+    list_check_point = []
+    for file in os.listdir():
+        if file.endswith(".txt"):
+            file_path = f"{path_checkpoint}\{file}"
+            check_point = get_pair(file_path)
+            list_check_point.append(check_point)
+    return list_check_point
+
+''' FORMAT THE INPUT TESTCASE TXT FILE '''
 def format_row(row):
     for i in range(len(row)):
         if row[i] == '1':
@@ -30,262 +48,258 @@ def format_row(row):
         elif row[i] == 'c':
             row[i] = '%'
 
+''' FORMAT THE INPUT CHECKPOINT TXT FILE '''
+def format_check_points(check_points):
+    result = []
+    for check_point in check_points:
+        result.append((check_point[0], check_point[1]))
+    return result
 
+''' READ A SINGLE TESTCASE TXT FILE '''
 def get_board(path):
-    result = np.loadtxt(path, dtype=str, delimiter=',')
+    result = np.loadtxt(f"{path}", dtype=str, delimiter=',')
     for row in result:
         format_row(row)
     return result
 
-
+''' READ A SINGLE CHECKPOINT TXT FILE '''
 def get_pair(path):
-    return np.loadtxt(path, dtype=int, delimiter=',')
+    result = np.loadtxt(f"{path}", dtype=int, delimiter=',')
+    return result
 
-
-def get_boards():
-    return [get_board(os.path.join(PATH_BOARD, f))
-            for f in os.listdir(PATH_BOARD) if f.endswith('.txt')]
-
-
-def get_check_points():
-    return [get_pair(os.path.join(PATH_CHECKPOINT, f))
-            for f in os.listdir(PATH_CHECKPOINT) if f.endswith('.txt')]
-
-
-# ==============================
-# INITIAL DATA
-# ==============================
+'''
+//========================//
+//      DECLARE AND       //
+//  INITIALIZE MAPS AND   //
+//      CHECK POINTS      //
+//========================//
+'''
 maps = get_boards()
 check_points = get_check_points()
 
-# ==============================
-# PYGAME SETUP
-# ==============================
+
+'''
+//========================//
+//         PYGAME         //
+//    INITIALIZATIONS     //
+//                        //
+//========================//
+'''
 pygame.init()
 pygame.font.init()
-
 screen = pygame.display.set_mode((640, 640))
-pygame.display.set_caption('Sokoban of Magic')
+pygame.display.set_caption('Sokoban')
 clock = pygame.time.Clock()
-
-# COLORS
+BACKGROUND = (0, 0, 0)
 WHITE = (255, 255, 255)
-GREEN = (0, 255, 0)
-GREY = (80, 80, 80)
-
-# LOAD ASSETS
-os.chdir(ASSETS_PATH)
-player = pygame.image.load('wizard.png')
-wall = pygame.image.load('wall2.png')
-box = pygame.image.load('stone.png')
-point = pygame.image.load('circle.png')
-space = pygame.image.load('space.png')
-arrow_left = pygame.image.load('arrow_left.png')
-arrow_right = pygame.image.load('arrow_right.png')
-
-init_background = pygame.image.load('background1.png')
-loading_background = pygame.image.load('loading1.png')
-notfound_background = pygame.image.load('notfound1.png')
-found_background = pygame.image.load('background1.png')
-
-# ==============================
-# DRAW HELPERS
-# ==============================
-def draw_text_center(text, size, color, y):
-    font = pygame.font.SysFont(None, size)
-    surf = font.render(text, True, color)
-    rect = surf.get_rect(center=(320, y))
-    screen.blit(surf, rect)
-
-
-def draw_text_left(text, size, color, x, y):
-    font = pygame.font.SysFont(None, size)
-    screen.blit(font.render(text, True, color), (x, y))
-
-
-def render_map(board):
-    width, height = len(board[0]), len(board)
+'''
+GET SOME ASSETS
+'''
+assets_path = os.getcwd() + "\\..\\Assets"
+os.chdir(assets_path)
+player = pygame.image.load(os.getcwd() + '\\player.png')
+wall = pygame.image.load(os.getcwd() + '\\wall.png')
+box = pygame.image.load(os.getcwd() + '\\box.png')
+point = pygame.image.load(os.getcwd() + '\\point.png')
+space = pygame.image.load(os.getcwd() + '\\space.png')
+arrow_left = pygame.image.load(os.getcwd() + '\\arrow_left.png')
+arrow_right = pygame.image.load(os.getcwd() + '\\arrow_right.png')
+init_background = pygame.image.load(os.getcwd() + '\\init_background.png')
+loading_background = pygame.image.load(os.getcwd() + '\\loading_background.png')
+notfound_background = pygame.image.load(os.getcwd() + '\\notfound_background.png')
+found_background = pygame.image.load(os.getcwd() + '\\found_background.png')
+'''
+RENDER THE MAP FOR GAMEPLAY
+'''
+def renderMap(board):
+    width = len(board[0])
+    height = len(board)
     indent = (640 - width * 32) / 2.0
-
     for i in range(height):
         for j in range(width):
             screen.blit(space, (j * 32 + indent, i * 32 + 250))
-            cell = board[i][j]
-            if cell == '#':
+            if board[i][j] == '#':
                 screen.blit(wall, (j * 32 + indent, i * 32 + 250))
-            elif cell == '$':
+            if board[i][j] == '$':
                 screen.blit(box, (j * 32 + indent, i * 32 + 250))
-            elif cell == '%':
+            if board[i][j] == '%':
                 screen.blit(point, (j * 32 + indent, i * 32 + 250))
-            elif cell == '@':
+            if board[i][j] == '@':
                 screen.blit(player, (j * 32 + indent, i * 32 + 250))
+'''
+VARIABLES INITIALIZATIONS
+'''
+# Map level
+mapNumber = 0
+# Algorithm to solve the game
+algorithm = "Breadth First Search"
+# Your scene states, including: 
+# init for choosing your map and algorithm
+# loading for displaying "loading scene"
+# executing for solving problem
+# playing for displaying the game
+sceneState = "init"
+loading = False
 
-
-def draw_progress_bar(x, y, w, h, progress):
-    pygame.draw.rect(screen, GREY, (x, y, w, h))
-    pygame.draw.rect(screen, GREEN, (x, y, w * progress, h))
-
-
-# ==============================
-# SCENES
-# ==============================
-def init_game(map, map_number, algorithm):
-    draw_text_center('Sokoban of Magic', 60, WHITE, 80)
-    draw_text_center('Select your map!!!', 20, WHITE, 140)
-    draw_text_center(f"Lv.{map_number + 1}", 30, WHITE, 200)
-    screen.blit(arrow_left, (246, 188))
-    screen.blit(arrow_right, (370, 188))
-    draw_text_center(algorithm, 30, WHITE, 600)
-    render_map(map)
-    draw_text_center("Press Enter to start | Space to switch AI", 18, WHITE, 620)
-
-
-def loading_game(elapsed_time):
-    screen.blit(loading_background, (0, 0))
-    draw_text_center('Solving...', 40, WHITE, 60)
-    draw_text_center('AI is thinking. Please wait...', 20, WHITE, 100)
-    draw_text_center(f"Elapsed: {elapsed_time:.1f}s", 24, WHITE, 580)
-
-
-def found_game(map, steps, ai_time, play_time):
-    screen.blit(found_background, (0, 0))
-    draw_text_center('🎉 Problem Solved!', 40, WHITE, 80)
-    draw_text_center(f'Steps: {steps}', 22, WHITE, 120)
-    draw_text_center(f'Algorithm: {ai_time:.2f}s | Play: {play_time:.2f}s', 22, WHITE, 150)
-    draw_text_center('Press Enter to continue or ESC to Main Menu', 20, WHITE, 600)
-    render_map(map)
-
-
-def notfound_game(ai_time):
-    screen.blit(notfound_background, (0, 0))
-    draw_text_center('Oh no, no solution found!', 40, WHITE, 100)
-    draw_text_center(f"Algorithm ran {ai_time:.2f}s with no result", 22, WHITE, 140)
-    draw_text_center('Press Enter to retry or ESC to Main Menu', 20, WHITE, 600)
-
-
-# ==============================
-# MAIN GAME LOOP
-# ==============================
+''' SOKOBAN FUNCTION '''
 def sokoban():
     running = True
-    scene_state = "init"
-    map_number = 0
-    algorithm = "Breadth First Search"
-    list_board = []
+    global sceneState
+    global loading
+    # global algorithm # LOẠI BỎ: Không cần thiết vì ta không thay đổi thuật toán
+    global list_board
+    global mapNumber
+    
+    # Đặt tên thuật toán cố định (cho mục đích hiển thị trong initGame, nếu initGame sử dụng biến global này)
+    algorithm = "Depth First Search" 
+    
+    stateLenght = 0
+    currentState = 0
     found = True
-    ai_runtime = 0
-    play_time = 0
-    ai_thread = None
-    ai_done = False
-    ai_start_time = None
-    state_length = 0
-    current_state = 0
-    start_play_time = 0
-    paused = False  # thêm trạng thái tạm dừng
-
-    def run_ai():
-        """Hàm chạy AI trong luồng riêng."""
-        nonlocal list_board, ai_runtime, ai_done, found
-        list_check_point = check_points[map_number]
-        t0 = time.time()
-        if algorithm == "Depth First Search":
-            #result = bfs.BFS_search(maps[map_number], list_check_point)
-            print("Need Implement")
-            result= None
-        else:
-            print("Need Implement")
-            #result = astar.AStart_Search(maps[map_number], list_check_point)
-            result= None
-        ai_runtime = time.time() - t0
-        list_board = result
-        ai_done = True
-        found = bool(result and len(result) > 0)
 
     while running:
         screen.blit(init_background, (0, 0))
+        if sceneState == "init":
+            # Choose map and display
+            initGame(maps[mapNumber])
 
-        if scene_state == "init":
-            init_game(maps[map_number], map_number, algorithm)
+        if sceneState == "executing":
+            # Choose map
+            list_check_point = check_points[mapNumber]
 
-        elif scene_state == "loading":
-            elapsed = time.time() - ai_start_time
-            loading_game(elapsed)
-            if ai_done:
-                if found:
-                    scene_state = "playing"
-                    state_length = len(list_board[0])
-                    current_state = 0
-                    start_play_time = time.time()
-                else:
-                    scene_state = "end"
-
-        elif scene_state == "playing":
-            if not paused:
-                play_time = time.time() - start_play_time
-                progress = current_state / state_length if state_length else 0
-                clock.tick(3)
-
-                render_map(list_board[0][current_state])
-                draw_progress_bar(120, 220, 400, 15, progress)
-                draw_text_left(f"Step: {current_state + 1}/{state_length}", 20, WHITE, 20, 20)
-                draw_text_left(f"Play Time: {play_time:.1f}s", 20, WHITE, 450, 20)
-                draw_text_center("Press P to Pause | ESC to Exit", 18, WHITE, 600)
-
-                current_state += 1
-                if current_state >= state_length:
-                    scene_state = "end"
+            # Loại bỏ logic chọn AStar/BFS. Chỉ chạy DFS.
+            print("DFS")
+            # Giả sử hàm DFS_search là hàm đã được đổi tên và là DFS của bạn
+            list_board = dfs.DFS_search(maps[mapNumber], list_check_point)
+            
+            if len(list_board) > 0:
+                sceneState = "playing"
+                # Giả sử list_board trả về (path, count), nên ta lấy list_board[0] là path
+                stateLenght = len(list_board[0]) 
+                currentState = 0
             else:
-                draw_text_center("⏸ PAUSED - Press P to Resume | ESC to Main Menu", 22, WHITE, 320)
-                render_map(list_board[0][current_state - 1])
-
-        elif scene_state == "end":
+                sceneState = "end"
+                found = False
+        
+        if sceneState == "loading":
+            loadingGame()
+            sceneState = "executing"
+            
+        if sceneState == "end":
             if found:
-                found_game(list_board[0][state_length - 1], state_length, ai_runtime, play_time)
+                foundGame(list_board[0][stateLenght - 1])
             else:
-                notfound_game(ai_runtime)
-
-        # ======================
-        # EVENTS
-        # ======================
+                notfoundGame()
+                
+        if sceneState == "playing":
+            clock.tick(2)
+            renderMap(list_board[0][currentState])
+            currentState = currentState + 1
+            if currentState == stateLenght:
+                sceneState = "end"
+                found = True
+                
+        # Check event when you press key board
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-
-            elif event.type == KEYDOWN:
-                if scene_state == "init":
-                    if event.key == pygame.K_RIGHT and map_number < len(maps) - 1:
-                        map_number += 1
-                    elif event.key == pygame.K_LEFT and map_number > 0:
-                        map_number -= 1
-                    elif event.key == pygame.K_SPACE:
-                        algorithm = "A Star Search" if algorithm == "Breadth First Search" else "Breadth First Search"
-                    elif event.key == pygame.K_RETURN:
-                        ai_done = False
-                        ai_thread = threading.Thread(target=run_ai)
-                        ai_thread.start()
-                        ai_start_time = time.time()
-                        scene_state = "loading"
-
-                elif scene_state == "playing":
-                    if event.key == pygame.K_p:
-                        paused = not paused
-                    elif event.key == pygame.K_ESCAPE:
-                        scene_state = "init"
-
-                elif scene_state == "end":
-                    if event.key == pygame.K_RETURN:
-                        scene_state = "init"
-                    elif event.key == pygame.K_ESCAPE:
-                        scene_state = "init"
-
+            if event.type == pygame.KEYDOWN:
+                
+                # Press arrow key board to change level map
+                if event.key == pygame.K_RIGHT and sceneState == "init":
+                    if mapNumber < len(maps) - 1:
+                        mapNumber = mapNumber + 1
+                if event.key == pygame.K_LEFT and sceneState == "init":
+                    if mapNumber > 0:
+                        mapNumber = mapNumber - 1
+                        
+                # Press ENTER key board to select level map and run DFS
+                if event.key == pygame.K_RETURN:
+                    if sceneState == "init":
+                        sceneState = "loading"
+                    if sceneState == "end":
+                        sceneState = "init"
+                        
+                # LOẠI BỎ: Không cần logic chuyển đổi thuật toán bằng phím SPACE
+                # if event.key == pygame.K_SPACE and sceneState == "init":
+                #    ... (Logic cũ đã bị loại bỏ)
+        
         pygame.display.flip()
-        clock.tick(30)
-
     pygame.quit()
 
+''' DISPLAY MAIN SCENE '''
+# DISPLAY INITIAL SCENE
+def initGame(map):
+    titleSize = pygame.font.Font('gameFont.ttf', 60)
+    titleText = titleSize.render('Among-koban', True, WHITE)
+    titleRect = titleText.get_rect(center=(320, 80))
+    screen.blit(titleText, titleRect)
 
-# ==============================
-# ENTRY POINT
-# ==============================
-if __name__ == "__main__":
+    desSize = pygame.font.Font('gameFont.ttf', 20)
+    desText = desSize.render('Now, select your map!!!', True, WHITE)
+    desRect = desText.get_rect(center=(320, 140))
+    screen.blit(desText, desRect)
+
+    mapSize = pygame.font.Font('gameFont.ttf', 30)
+    mapText = mapSize.render("Lv." + str(mapNumber + 1), True, WHITE)
+    mapRect = mapText.get_rect(center=(320, 200))
+    screen.blit(mapText, mapRect)
+
+    screen.blit(arrow_left, (246, 188))
+    screen.blit(arrow_right, (370, 188))
+
+    algorithmSize = pygame.font.Font('gameFont.ttf', 30)
+    algorithmText = algorithmSize.render(str(algorithm), True, WHITE)
+    algorithmRect = algorithmText.get_rect(center=(320, 600))
+    screen.blit(algorithmText, algorithmRect)
+    renderMap(map)
+
+''' LOADING SCENE '''
+# DISPLAY LOADING SCENE
+def loadingGame():
+    screen.blit(loading_background, (0, 0))
+
+    fontLoading_1 = pygame.font.Font('gameFont.ttf', 40)
+    text_1 = fontLoading_1.render('SHHHHHHH!', True, WHITE)
+    text_rect_1 = text_1.get_rect(center=(320, 60))
+    screen.blit(text_1, text_rect_1)
+
+    fontLoading_2 = pygame.font.Font('gameFont.ttf', 20)
+    text_2 = fontLoading_2.render('The problem is being solved, stay right there!', True, WHITE)
+    text_rect_2 = text_2.get_rect(center=(320, 100))
+    screen.blit(text_2, text_rect_2)
+
+def foundGame(map):
+    screen.blit(found_background, (0, 0))
+
+    font_1 = pygame.font.Font('gameFont.ttf', 30)
+    text_1 = font_1.render('Yeah! The problem is solved!!!', True, WHITE)
+    text_rect_1 = text_1.get_rect(center=(320, 100))
+    screen.blit(text_1, text_rect_1)
+
+    font_2 = pygame.font.Font('gameFont.ttf', 20)
+    text_2 = font_2.render('Press Enter to continue.', True, WHITE)
+    text_rect_2 = text_2.get_rect(center=(320, 600))
+    screen.blit(text_2, text_rect_2)
+
+    renderMap(map)
+
+def notfoundGame():
+    screen.blit(notfound_background, (0, 0))
+
+    font_1 = pygame.font.Font('gameFont.ttf', 40)
+    text_1 = font_1.render('Oh no, I tried my best :(', True, WHITE)
+    text_rect_1 = text_1.get_rect(center=(320, 100))
+    screen.blit(text_1, text_rect_1)
+
+    font_2 = pygame.font.Font('gameFont.ttf', 20)
+    text_2 = font_2.render('Press Enter to continue.', True, WHITE)
+    text_rect_2 = text_2.get_rect(center=(320, 600))
+    screen.blit(text_2, text_rect_2)
+
+    
+def main():
     sokoban()
+
+if __name__ == "__main__":
+    main()

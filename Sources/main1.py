@@ -111,6 +111,7 @@ def render_map(board):
         for j in range(width):
             screen.blit(space, (j * 32 + indent, i * 32 + 250))
             cell = board[i][j]
+            
             if cell == '#':
                 screen.blit(wall, (j * 32 + indent, i * 32 + 250))
             elif cell == '$':
@@ -119,6 +120,15 @@ def render_map(board):
                 screen.blit(point, (j * 32 + indent, i * 32 + 250))
             elif cell == '@':
                 screen.blit(player, (j * 32 + indent, i * 32 + 250))
+            
+            # ----- ADD THESE TWO NEW CASES -----
+            elif cell == 'X': # 'X' = Box on Goal
+                screen.blit(point, (j * 32 + indent, i * 32 + 250)) # Draw goal
+                screen.blit(box, (j * 32 + indent, i * 32 + 250))   # Draw box on top
+            elif cell == '+': # '+' = Player on Goal
+                screen.blit(point, (j * 32 + indent, i * 32 + 250)) # Draw goal
+                screen.blit(player, (j * 32 + indent, i * 32 + 250)) # Draw player on top
+            # -------------------------------------
 
 
 def draw_progress_bar(x, y, w, h, progress):

@@ -152,20 +152,62 @@ def isFailed(posBox):
 
 
 def transferToGameState(layout):
-    # Input format is already comma-separated, so we just need to split each line
-    layout = [line.split(",") for line in layout if line.strip()]
+    """
+    Hàm này được cập nhật để xử lý hai định dạng layout đầu vào:
+    1. Từ main1.py: List['#####', '#@#'] (không có dấu phẩy)
+    2. Từ run_*.py: List['#,#,#', '#,@,#'] (có dấu phẩy)
+    """
+    processed_layout = []
+    
+    # Tự động phát hiện định dạng layout
+    if layout and ',' in layout[0]:
+        # Định dạng 2: Có dấu phẩy (từ run_astar.py / run_dfs.py)
+        # Tách bằng dấu phẩy và loại bỏ khoảng trắng thừa
+        for line in layout:
+            if line.strip():
+                processed_layout.append([cell.strip() for cell in line.split(',')])
+    else:
+        # Định dạng 1: Không có dấu phẩy (từ main1.py)
+        # Tách từng ký tự
+        for line in layout:
+            if line.strip():
+                processed_layout.append(list(line))
+
+    # Gán layout đã xử lý để tiếp tục
+    layout = processed_layout
+    if not layout:
+        return np.array([], dtype=int) # Trả về mảng rỗng nếu không có gì
+
     maxColsNum = max([len(x) for x in layout])
     for irow in range(len(layout)):
         for icol in range(len(layout[irow])):
-            if layout[irow][icol] == ' ' or layout[irow][icol] == '': layout[irow][icol] = 0
-            elif layout[irow][icol] == '#' or layout[irow][icol] == '1': layout[irow][icol] = 1
-            elif layout[irow][icol] == '&' or layout[irow][icol] == 'p': layout[irow][icol] = 2
-            elif layout[irow][icol] == 'B' or layout[irow][icol] == 'b': layout[irow][icol] = 3
-            elif layout[irow][icol] == '.' or layout[irow][icol] == 'c': layout[irow][icol] = 4
-            elif layout[irow][icol] == 'X': layout[irow][icol] = 5  # Box on goal position
+            # Lấy ký tự và chuẩn hóa nó
+            cell = str(layout[irow][icol]).strip()
+
+            if cell == ' ' or cell == '':
+                layout[irow][icol] = 0  # 0 = Space
+            elif cell == '#' or cell == '1':
+                layout[irow][icol] = 1  # 1 = Wall
+            elif cell == '@' or cell == '&' or cell == 'p':
+                layout[irow][icol] = 2  # 2 = Player
+            elif cell == '$' or cell == 'B' or cell == 'b':
+                layout[irow][icol] = 3  # 3 = Box
+            elif cell == '%' or cell == '.' or cell == 'c':
+                layout[irow][icol] = 4  # 4 = Goal
+            elif cell == 'X':
+                layout[irow][icol] = 5  # 5 = Box on Goal
+            elif cell == '+': # Thêm ký tự Player on Goal từ lần sửa trước
+                layout[irow][icol] = 2 # Vẫn là Player (vì nó đứng trên Goal)
+            else:
+                # Nếu gặp ký tự lạ, mặc định là space
+                layout[irow][icol] = 0 
+        
+        # Đệm thêm tường vào các hàng không đủ độ dài
         colsNum = len(layout[irow])
         if colsNum < maxColsNum:
             layout[irow].extend([1 for _ in range(maxColsNum-colsNum)])
+
+    # Bây giờ mảng đã an toàn để chuyển đổi
     return np.array(layout, dtype=int)
 
 
@@ -175,17 +217,27 @@ def printBoard(gs, posPlayer, posBox):
     for i in range(rows):
         row = ""
         for j in range(cols):
-            cell = " "
-            if (i, j) in posWalls:
-                cell = "#"
-            elif (i, j) in posBox and (i, j) in posGoals:
-                cell = "X"
-            elif (i, j) in posBox:
-                cell = "B"
-            elif (i, j) in posGoals:
-                cell = "."
-            if (i, j) == posPlayer:
-                cell = "&"
+            # Determine the character for the cell by checking layers
+            cell = " " # Default is space
+            
+            is_wall = (i, j) in posWalls
+            is_goal = (i, j) in posGoals
+            is_box = (i, j) in posBox
+            is_player = (i, j) == posPlayer
+
+            if is_wall:
+                cell = "#" # Wall
+            elif is_box and is_goal:
+                cell = "X" # Box on Goal
+            elif is_player and is_goal:
+                cell = "+" # Player on Goal
+            elif is_box:
+                cell = "$" # Box
+            elif is_player:
+                cell = "@" # Player
+            elif is_goal:
+                cell = "%" # Goal
+            
             row += cell
         display.append(row)
     return "\n".join(display), cols

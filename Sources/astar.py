@@ -1,6 +1,3 @@
-"""
-A* (A Star) implementation for Sokoban - based on run_astar.py logic
-"""
 import time
 import sokoban_helpers as H
 from sokoban_helpers import (
@@ -14,71 +11,91 @@ from sokoban_helpers import (
     updateState,
     isFailed,
     transferToGameState,
-    applyActionSequence,
 )
 
 
 def heuristic(posPlayer, posBox):
-    """A heuristic function to calculate the overall distance between boxes and goals"""
     distance = 0
     completes = set(H.posGoals) & set(posBox)
     sortposBox = list(set(posBox).difference(completes))
     sortposGoals = list(set(H.posGoals).difference(completes))
     
-    # Handle case where there are different numbers of boxes and goals
     min_length = min(len(sortposBox), len(sortposGoals))
     for i in range(min_length):
-        distance += (abs(sortposBox[i][0] - sortposGoals[i][0])) + (abs(sortposBox[i][1] - sortposGoals[i][1]))
+        distance += (abs(sortposBox[i][0] - sortposGoals[i][0])) + \
+                    (abs(sortposBox[i][1] - sortposGoals[i][1]))
     
-    # Add penalty for unmatched boxes or goals
-    if len(sortposBox) > len(sortposGoals):
-        # Extra boxes - add large penalty
-        distance += 1000 * (len(sortposBox) - len(sortposGoals))
-    elif len(sortposGoals) > len(sortposBox):
-        # Extra goals - add large penalty  
-        distance += 1000 * (len(sortposGoals) - len(sortposBox))
+    if len(sortposBox) != len(sortposGoals):
+         distance += 1000 * abs(len(sortposBox) - len(sortposGoals))
     
     return distance
 
 
 def cost(actions):
-    """A cost function"""
-    return len([x for x in actions if x.islower()])
+    return len([x for x in actions if x.isupper()])
 
 
 def aStarSearch():
-    """A* search implementation - exact logic from run_astar.py"""
     beginBox = PosOfBoxes(H.gameState)
     beginPlayer = PosOfPlayer(H.gameState)
 
     start_state = (beginPlayer, beginBox)
     frontier = PriorityQueue()
-    frontier.push([start_state], heuristic(beginPlayer, beginBox))
-    exploredSet = set()
     actions = PriorityQueue()
-    actions.push([0], heuristic(beginPlayer, start_state[1]))
+    
+    exploredSet = set()
+    
     count = 0
-    while frontier:
-        if frontier.isEmpty():
-            return 'x'
+    initial_g = 0
+    initial_h = heuristic(beginPlayer, beginBox)
+    initial_f = initial_g + initial_h
+
+    frontier.push([start_state], initial_f) 
+    actions.push([], initial_f)
+
+    
+    while not frontier.isEmpty():
         node = frontier.pop()
         node_action = actions.pop()
-        if isEndState(node[-1][-1]):
-            solution = ','.join(node_action[1:]).replace(',','')
-            print(solution)
-            print(count)
-            return solution
-        if node[-1] not in exploredSet:
-            exploredSet.add(node[-1])
-            Cost = cost(node_action[1:])
-            for action in legalActions(node[-1][0], node[-1][1]):
-                newPosPlayer, newPosBox = updateState(node[-1][0], node[-1][1], action)
-                if isFailed(newPosBox):
-                    continue
-                count = count + 1
-                Heuristic = heuristic(newPosPlayer, newPosBox)
-                frontier.push(node + [(newPosPlayer, newPosBox)], Heuristic + Cost)
-                actions.push(node_action + [action[-1]], Heuristic + Cost)
+
+        current_state = node[-1] 
+        current_posPlayer = current_state[0]
+        current_posBox = current_state[1]
+
+        if current_state in exploredSet:
+             continue
+        
+        exploredSet.add(current_state)
+        count += 1
+
+        if isEndState(current_posBox):
+            solution = ''.join(node_action) 
+            print(f"Solution found: {solution}")
+            print(f"States explored: {count}")
+            return solution, count
+
+        current_g_cost = cost(node_action) 
+        
+        for action in legalActions(current_posPlayer, current_posBox):
+            newPosPlayer, newPosBox = updateState(current_posPlayer, current_posBox, action)
+            new_state = (newPosPlayer, newPosBox)
+            
+            if isFailed(newPosBox):
+                continue
+            
+            if new_state in exploredSet:
+                continue
+
+            new_action_char = action[-1]
+            new_g_cost = current_g_cost + cost([new_action_char])
+            new_h_cost = heuristic(newPosPlayer, newPosBox)
+            f_cost = new_g_cost + new_h_cost # f(n) = g(n) + h(n)
+            
+            frontier.push(node + [new_state], f_cost) 
+            actions.push(node_action + [new_action_char], f_cost)
+
+    print("No solution found")
+    return 'x', count
 
 
 def astar_search(layout, time_limit=1800):
@@ -90,24 +107,25 @@ def astar_search(layout, time_limit=1800):
     H.posWalls = PosOfWalls(H.gameState)
     H.posGoals = PosOfGoals(H.gameState)
     
-    # Check timeout during search
-    solution = aStarSearch()
+    solution, explored_count = aStarSearch()
     
     time_end = time.time()
     if time_end - time_start > time_limit:
         print("Timeout!")
-        return 'x'
-    
-    return solution
+        return 'x', explored_count
+    return solution, explored_count
 
 
 def test_astar():
     """Test function"""
-    with open("input/1.txt", "r", encoding="utf-8") as f:
-        layout = [line.rstrip("\n") for line in f if line.strip() != ""]
-    
-    solution = astar_search(layout)
-    print(f"Final A* solution: {solution}")
+    try:
+        with open("input/1.txt", "r", encoding="utf-8") as f:
+            layout = [line.rstrip("\n") for line in f if line.strip() != ""]
+        
+        solution, count = astar_search(layout)
+        print(f"Final A* solution: {solution}, Explored: {count}")
+    except FileNotFoundError:
+        print("Lỗi: Không tìm thấy file 'input/1.txt'. Vui lòng tạo file này để kiểm tra.")
 
 
 if __name__ == "__main__":

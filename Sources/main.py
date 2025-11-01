@@ -239,7 +239,7 @@ def sokoban():
     found = True
     ai_runtime = 0
     ai_explored_states = 0
-    ai_max_memory = 0 # Max Total RAM usage
+    ai_max_memory = 0
     play_time = 0
     ai_thread = None
     ai_done = False

@@ -4,21 +4,7 @@ Giải bài toán Sokoban bằng 2 thuật toán: **A*** và **DFS**
 
 ## 🚀 Cách chạy nhanh:
 
-### **1. Chạy thuật toán riêng lẻ (Khuyến nghị):**
-```bash
-# A* Algorithm
-python run_astar.py --input input/1.txt --output result_astar.txt
-
-# DFS Algorithm  
-python run_dfs.py --input input/1.txt --output result_dfs.txt
-```
-
-### **2. Demo so sánh cả 2 thuật toán:**
-```bash
-python demo.py
-```
-
-### **3. Game GUI (Cần pygame):**
+### **1. Game GUI (Cần pygame):**
 ```bash
 # Cài đặt pygame trước
 pip install pygame numpy
@@ -29,22 +15,18 @@ python main.py
 
 ## 📊 Kết quả so sánh:
 
-| Map | Thuật toán | Số bước | Thời gian | Ưu điểm |
+| Map | Thuật toán | Số bước | Thời gian | RAM |
 |-----|------------|---------|-----------|---------|
-| input/1.txt | A* | 69 | 0.15s | Đường ngắn nhất |
-| input/1.txt | DFS | 83 | 0.04s | Nhanh hơn |
-| input/2.txt | A* | 33 | 0.07s | Tối ưu |
-| input/2.txt | DFS | 58 | 0.09s | Đơn giản |
+| Testcases/1.txt | A* | 96 | 0.21s | 61.74 |
+| Testcases/1.txt | DFS | 82 | 0.1s | 62.36 |
+| Testcases/2.txt | A* | 119 | 2.17s | 68.58 |
+| Testcases/2.txt | DFS | 143 | 0.81s | 68.63 |
 
 ## 📁 Cấu trúc file:
 
 ```
-sokoban/
-├── input/              # Maps đầu vào
-├── run_astar.py        # Chạy A* với file
-├── run_dfs.py         # Chạy DFS với file  
+Sources/
 ├── main.py            # Game GUI
-├── demo.py            # Demo so sánh
 ├── astar.py           # Module A*
 ├── dfs.py             # Module DFS
 └── sokoban_helpers.py # Helper functions
